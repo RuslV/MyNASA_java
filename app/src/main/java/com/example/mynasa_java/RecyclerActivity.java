@@ -39,11 +39,10 @@ import java.util.stream.Collectors;
 public class RecyclerActivity extends AppCompatActivity {
     private RecyclerView recycler;
     private Adapter adapter;
-    private DateRecycler dateRecycler;
-    private List<DateDTO> list;
+    private List<DateDTO> listDTO;
     private TextView textView;
-
     private static final String EXTRA_URL = "PhotoActivity.EXTRA_URL";
+    public static final String TAG = "mylog";
 
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -52,6 +51,7 @@ public class RecyclerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.recycler);
         init();
+
         GridLayoutManager layoutManager = new GridLayoutManager(this, 2);
         recycler.setLayoutManager(layoutManager);
         recycler.setAdapter(adapter);
@@ -60,17 +60,18 @@ public class RecyclerActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     private void init() {
-        list = DateRecycler.listDates.stream().sorted((o1, o2) -> o2.getDate().compareTo(o1.getDate())).collect(Collectors.toList());
+        listDTO = DateRecycler.listDates.stream().sorted((o1, o2) -> o2.getDate().compareTo(o1.getDate())).collect(Collectors.toList());
         recycler = findViewById(R.id.recycler);
-        dateRecycler = new DateRecycler();
-        adapter = new Adapter(this, list);
+        adapter = new Adapter(getApplicationContext(), listDTO);
     }
 
     private class Adapter extends RecyclerView.Adapter<ViewHolder> {
+       private Context context;
         private final List<DateDTO> listDates;
 
 
         public Adapter(Context context, List<DateDTO> listDates) {
+            this.context=context;
             this.listDates = listDates;
         }
 
@@ -84,12 +85,9 @@ public class RecyclerActivity extends AppCompatActivity {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            Context context = getApplicationContext();
-            // Log.d(MainActivity.MY_LOG, "listDates: " + listDates.get(position).getUrl());
             textView.setText(listDates.get(position).getDate());
             loadImageWithGlide(listDates.get(position).getUrl(), holder.imageView);
-            holder.bind(listDates.get(position).getHdurl());
-
+            holder.bind(listDates.get(position).getUrl());
         }
 
         @Override

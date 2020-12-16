@@ -1,0 +1,17 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+dependencies {
+
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.9'//RxJava
+    implementation 'io.reactivex.rxjava2:rxandroid:2.0.1'//RxJava для Android
+
+
+
+
+}

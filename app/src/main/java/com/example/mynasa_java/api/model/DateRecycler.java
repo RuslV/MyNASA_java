@@ -19,12 +19,4 @@ public class DateRecycler {
     public void addDates(DateDTO dates){
         listDates.add(dates);
     }
-
-    public void addDates(List<DateDTO> list){
-        listDates.addAll(list);
-    }
-
-    public List<DateDTO> getListDates() {
-        return listDates;
-    }
 }

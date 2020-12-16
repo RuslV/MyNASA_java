@@ -4,6 +4,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
@@ -21,7 +22,9 @@ import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
+import com.example.mynasa_java.WorkManager.MyRxWorker;
 import com.example.mynasa_java.WorkManager.MyWorker;
+import com.example.mynasa_java.api.model.DateDTO;
 import com.example.mynasa_java.api.model.DateRecycler;
 import com.example.mynasa_java.api.model.JSONHelper;
 import com.example.mynasa_java.databinding.ActivityMainBinding;
@@ -30,13 +33,18 @@ import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-
 
 public class MainActivity extends AppCompatActivity {
 
@@ -44,15 +52,34 @@ public class MainActivity extends AppCompatActivity {
 
     private ActivityMainBinding bindingActMain;
     private CompositeDisposable disposable;
-    private DateRecycler dateRecyclerList;
+    private List<DateDTO> listDTO;//лист с данными JSON, заполняется в init()
     private JSONHelper jsonHelper;
+    private App app;
 
     private static final String EXTRA_URL = "PhotoActivity.EXTRA_URL";
+
+    @SuppressLint("CheckResult")
+    private void init() {
+        app = (App) getApplication();
+        disposable = new CompositeDisposable();
+        jsonHelper = new JSONHelper();
+        listDTO = new ArrayList<>();
+
+        Observable.just(jsonHelper.importFromJSON(this))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(list -> {
+                    if (list.size() > 0) {
+                        listDTO.addAll(list);
+                    }
+                });
+    }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @SuppressLint("ResourceType")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.i(TAG, "onCreate: START");
         super.onCreate(savedInstanceState);
         bindingActMain = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(bindingActMain.getRoot());
@@ -60,90 +87,114 @@ public class MainActivity extends AppCompatActivity {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             backgroundWorkPeriodic(this);
         }
-
         init();
-
         //getSupportActionBar().setTitle(getString(R.string.choose_day));
-
-        App app = (App) getApplication();
 
         disposable.add(app.getNasaService().getApi().getDatesWithPhoto()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe((dates, throwable) -> {
-                    int size = dateRecyclerList.getListDates().size();//данные из памяти
+                    int size = listDTO.size();//данные из памяти
                     if (throwable != null) {
                         if (size > 0) {
                             Toast toast = Toast.makeText(MainActivity.this, "Не удалось загрузить данные с сети! \nПроверьте соединение с интернетом.\nЗагрузка данных из памяти...", Toast.LENGTH_LONG);
                             toast.setGravity(Gravity.CENTER, 0, 0);
                             toast.show();
                             //устанавливаем данные из памяти
-                            bindingActMain.textView1.setText(dateRecyclerList.getListDates().get(size - 1).getDate());
-                            loadImageWithGlide(dateRecyclerList.getListDates().get(size - 1).getUrl());
-                            bindingActMain.textView2.setText(dateRecyclerList.getListDates().get(size - 1).getExplanation());
+                            bindingActMain.textView1.setText(listDTO.get(size - 1).getDate());
+                            loadImageWithGlide(listDTO.get(size - 1).getUrl());
+                            bindingActMain.textView2.setText(listDTO.get(size - 1).getExplanation());
                         } else {
                             Toast toast = Toast.makeText(MainActivity.this, "Нет данных\nПроверьте соединение с интернетом.", Toast.LENGTH_LONG);
                             toast.setGravity(Gravity.CENTER, 0, 0);
                             toast.show();
                         }
                     } else {
-                        if (size > 0) {
-                            if (dates.getDate().equals(dateRecyclerList.getListDates().get(size - 1).getDate())) {
-                                //если данные с сети такие же как в памяти
-                                Toast toast = Toast.makeText(MainActivity.this, "Нет новых данных", Toast.LENGTH_LONG);
+                        if (!(dates.getMedia_type().equals("image"))) {
+                            if (size > 0) {
+                                Toast toast = Toast.makeText(MainActivity.this, "Media type not image.\nSetting data from the memory", Toast.LENGTH_LONG);
                                 toast.setGravity(Gravity.CENTER, 0, 0);
                                 toast.show();
-                                //устанавливаем данные из памяти
-                                bindingActMain.textView1.setText(dateRecyclerList.getListDates().get(size - 1).getDate());
-                                loadImageWithGlide(dateRecyclerList.getListDates().get(size - 1).getUrl());
-                                bindingActMain.textView2.setText(dateRecyclerList.getListDates().get(size - 1).getExplanation());
-
+                                bindingActMain.textView1.setText(listDTO.get(size - 1).getDate());
+                                loadImageWithGlide(listDTO.get(size - 1).getUrl());
+                                bindingActMain.textView2.setText(listDTO.get(size - 1).getExplanation());
                             } else {
-                                //если данные с сети новые, устанавливаем их и запоминаем в файл через exportToJSON
+                                Toast toast = Toast.makeText(MainActivity.this, "Media type not image.\nNo data in memory", Toast.LENGTH_LONG);
+                                toast.setGravity(Gravity.CENTER, 0, 0);
+                                toast.show();
+                            }
+                        } else if (dates.getMedia_type().equals("image")) {
+                            if (size > 0) {
+                                if (dates.getDate().equals(listDTO.get(size - 1).getDate())) {
+                                    //если данные с сети такие же как в памяти
+                                    Toast toast = Toast.makeText(MainActivity.this, "No new data.\nSetting data from the memory", Toast.LENGTH_LONG);
+                                    toast.setGravity(Gravity.CENTER, 0, 0);
+                                    toast.show();
+                                    //устанавливаем данные из памяти
+                                    bindingActMain.textView1.setText(listDTO.get(size - 1).getDate());
+                                    loadImageWithGlide(listDTO.get(size - 1).getUrl());
+                                    bindingActMain.textView2.setText(listDTO.get(size - 1).getExplanation());
+                                } else {
+                                    //если данные с сети новые, устанавливаем их и запоминаем в файл через exportToJSON
+                                    bindingActMain.textView1.setText(dates.getDate());
+                                    loadImageWithGlide(dates.getUrl());
+                                    bindingActMain.textView2.setText(dates.getExplanation());
+                                    listDTO.add(dates);
+                                    Observable.just(jsonHelper.exportToJSON(MainActivity.this, listDTO))
+                                            .subscribeOn(Schedulers.io())
+                                            .observeOn(AndroidSchedulers.mainThread())
+                                            .subscribe();
+                                }
+                            } else {
+                                //если в памяти нет данных, устанавливаем новые данные и запоминаем их через exportToJSON
                                 bindingActMain.textView1.setText(dates.getDate());
                                 loadImageWithGlide(dates.getUrl());
                                 bindingActMain.textView2.setText(dates.getExplanation());
-                                dateRecyclerList.addDates(dates);
-                                Observable.just(jsonHelper.exportToJSON(MainActivity.this, dateRecyclerList.getListDates()))
+                                listDTO.add(dates);
+                                Observable.just(jsonHelper.exportToJSON(MainActivity.this, listDTO))
                                         .subscribeOn(Schedulers.io())
                                         .observeOn(AndroidSchedulers.mainThread())
                                         .subscribe();
-                                DateRecycler.listDates = dateRecyclerList.getListDates();
                             }
-                        } else {
-                            //если в памяти нет данных, устанавливаем новые данные и запоминаем их через exportToJSON
-                            bindingActMain.textView1.setText(dates.getDate());
-                            loadImageWithGlide(dates.getUrl());
-                            bindingActMain.textView2.setText(dates.getExplanation());
-                            dateRecyclerList.addDates(dates);
-                            Observable.just(jsonHelper.exportToJSON(MainActivity.this, dateRecyclerList.getListDates()))
-                                    .subscribeOn(Schedulers.io())
-                                    .observeOn(AndroidSchedulers.mainThread())
-                                    .subscribe();
-                            DateRecycler.listDates = dateRecyclerList.getListDates();
                         }
                     }
                 }));
+        DateRecycler.listDates = listDTO;
+
         clickButton();
+
         clickImage();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public static void backgroundWork(Context context) {
-        Constraints constraints = new Constraints.Builder()
-                .addContentUriTrigger(Uri.parse("https://api.nasa.gov/planetary/apod?api_key=bUPDj3NcY7TPvoShGVEilLJJmiYHzdqyirJx04n4"), true)
-                .build();
-        OneTimeWorkRequest myWorkRequest = new OneTimeWorkRequest.Builder(MyWorker.class)
-                .setConstraints(constraints)
-                .build();
-        WorkManager.getInstance(context).enqueueUniqueWork("download", ExistingWorkPolicy.REPLACE, myWorkRequest);
-    }
+
+//    @RequiresApi(api = Build.VERSION_CODES.N)
+//    public static void backgroundWork(Context context) {
+//        /*Constraints constraints = new Constraints.Builder()
+//                .addContentUriTrigger(Uri.parse("https://api.nasa.gov/planetary/apod?api_key=bUPDj3NcY7TPvoShGVEilLJJmiYHzdqyirJx04n4"), true)
+//                .build();*/
+//       /* Calendar currentDate = Calendar.getInstance();
+//        Calendar dueDate = Calendar.getInstance();
+//        dueDate.set(Calendar.HOUR_OF_DAY, 10);
+//        dueDate.set(Calendar.MINUTE, 3);
+//        dueDate.set(Calendar.SECOND, 0);
+//        if (dueDate.before(currentDate)) {
+//            dueDate.add(Calendar.HOUR_OF_DAY, 24);
+//        }
+//        long timeDiff = dueDate.getTimeInMillis() - currentDate.getTimeInMillis();*/
+//
+//        OneTimeWorkRequest myWorkRequest = new OneTimeWorkRequest.Builder(MyWorker.class)
+//                //.setInitialDelay(timeDiff, TimeUnit.MINUTES)
+//                //.addTag("TAG")
+//                .build();
+//        WorkManager.getInstance(context).enqueueUniqueWork("download", ExistingWorkPolicy.REPLACE, myWorkRequest);
+//    }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static void backgroundWorkPeriodic(Context context) {
-        PeriodicWorkRequest myWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class,1440,TimeUnit.MINUTES, 1400,TimeUnit.MINUTES)
+        PeriodicWorkRequest myWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class, 6, TimeUnit.HOURS, 5, TimeUnit.HOURS)
+                .addTag("UNIQUE")
                 .build();
-        WorkManager.getInstance(context).enqueue(myWorkRequest);
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork("UNIQUE", ExistingPeriodicWorkPolicy.KEEP, myWorkRequest);
     }
 
     private void loadImageWithGlide(String url) {
@@ -184,27 +235,12 @@ public class MainActivity extends AppCompatActivity {
     private void clickImage() {
         bindingActMain.image.setOnClickListener(v -> {
             Intent intent = new Intent(v.getContext(), PhotoActivity.class);
-            intent.putExtra(EXTRA_URL, DateRecycler.listDates.get(DateRecycler.listDates.size() - 1).getUrl());
+            if (DateRecycler.listDates.get(DateRecycler.listDates.size() - 1).getHdurl() != null) {
+                intent.putExtra(EXTRA_URL, DateRecycler.listDates.get(DateRecycler.listDates.size() - 1).getHdurl());
+            } else
+                intent.putExtra(EXTRA_URL, DateRecycler.listDates.get(DateRecycler.listDates.size() - 1).getUrl());
             startActivity(intent);
         });
-    }
-
-    @SuppressLint("CheckResult")
-    private void init() {
-        disposable = new CompositeDisposable();
-        dateRecyclerList = new DateRecycler();
-        jsonHelper = new JSONHelper();
-
-        Observable.just(jsonHelper.importFromJSON(this))
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(list -> {
-                    if (list.size() > 0) {
-                        dateRecyclerList.getListDates().clear();
-                        dateRecyclerList.getListDates().addAll(list);
-                    }
-                });
-
     }
 }
 

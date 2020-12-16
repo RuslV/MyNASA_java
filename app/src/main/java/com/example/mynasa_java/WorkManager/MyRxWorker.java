@@ -2,54 +2,50 @@ package com.example.mynasa_java.WorkManager;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.os.Build;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.work.WorkManager;
-import androidx.work.Worker;
 import androidx.work.WorkerParameters;
+import androidx.work.rxjava3.RxWorker;
 
 import com.example.mynasa_java.App;
 import com.example.mynasa_java.api.model.DateDTO;
 import com.example.mynasa_java.api.model.DateRecycler;
 import com.example.mynasa_java.api.model.JSONHelper;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import io.reactivex.Observable;
-import io.reactivex.Single;
-import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.core.Single;
 import io.reactivex.schedulers.Schedulers;
 
-public class MyWorker extends Worker {
+
+public class MyRxWorker extends RxWorker {
     public static final String TAG = "mylog";
-    private DateRecycler dateRecyclerList;
     private JSONHelper jsonHelper;
     private List<DateDTO> listDTO;
 
-
-    public MyWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
-        super(context, workerParams);
+    /**
+     * @param appContext   The application {@link Context}
+     * @param workerParams Parameters to setup the internal state of this worker
+     */
+    public MyRxWorker(@NonNull Context appContext, @NonNull WorkerParameters workerParams) {
+        super(appContext, workerParams);
     }
 
     @SuppressLint("CheckResult")
-    @RequiresApi(api = Build.VERSION_CODES.N)
     @NonNull
     @Override
-    public Result doWork() {
+    public Single<Result> createWork() {
         CompositeDisposable disposable = new CompositeDisposable();
 
-        Log.i(TAG, "MyWorker_doWork: START. " + Thread.currentThread());
-
-        dateRecyclerList = new DateRecycler();
         jsonHelper = new JSONHelper();
         App app = (App) getApplicationContext();
         listDTO = new ArrayList<>();
+
+        Log.i(TAG, "MyWorker_doWork: START. " + Thread.currentThread());
 
         Observable.just(jsonHelper.importFromJSON(app))
                 .subscribeOn(Schedulers.io())
@@ -77,10 +73,10 @@ public class MyWorker extends Worker {
                                         }
                                     }
                                 }));
-
                     }
                 });
         DateRecycler.listDates = listDTO;
-        return Result.success();
+        return Single.just(Result.failure());
     }
 }
+
