@@ -11,4 +11,7 @@ public interface NasaApi {
 
     @GET("apod")
     Single<DateDTO> getDatesWithPhoto();
+
+    @GET("apod")
+    DateDTO getDatesWithPhotoList();
 }

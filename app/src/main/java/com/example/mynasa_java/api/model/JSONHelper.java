@@ -6,6 +6,7 @@ import android.content.Context;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.example.mynasa_java.App;
 import com.example.mynasa_java.MainActivity;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -25,6 +26,7 @@ public class JSONHelper extends Application {
 
     private static final String FILE_NAME = "data.txt";
     private static final String TAG ="mylog" ;
+    //List<DateDTO> dataList = new ArrayList<>();
 
     public List<DateDTO> exportToJSON(Context context,List<DateDTO> dataList) {
         GsonBuilder builder = new GsonBuilder();
@@ -41,8 +43,7 @@ public class JSONHelper extends Application {
         return dataList;
     }
 
-    public List<DateDTO> importFromJSON(Context context) {
-        List<DateDTO> dataList = new ArrayList<>();
+    public List<DateDTO> importFromJSON(Context context, List <DateDTO> dataList) {
         try (FileInputStream fis = context.openFileInput(FILE_NAME); BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fis))) {
             Gson gson = new GsonBuilder().create();
             StringBuilder stringBuilder = new StringBuilder();

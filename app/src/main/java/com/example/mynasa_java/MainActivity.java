@@ -5,8 +5,6 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.ExistingWorkPolicy;
-import androidx.work.OneTimeWorkRequest;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
@@ -14,7 +12,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -22,7 +19,6 @@ import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
-import com.example.mynasa_java.WorkManager.MyRxWorker;
 import com.example.mynasa_java.WorkManager.MyWorker;
 import com.example.mynasa_java.api.model.DateDTO;
 import com.example.mynasa_java.api.model.DateRecycler;
@@ -35,7 +31,6 @@ import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -45,6 +40,8 @@ import android.view.View;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
+
+import static androidx.work.NetworkType.CONNECTED;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -65,21 +62,34 @@ public class MainActivity extends AppCompatActivity {
         jsonHelper = new JSONHelper();
         listDTO = new ArrayList<>();
 
-        Observable.just(jsonHelper.importFromJSON(this))
+        Observable.just(listDTO)
+                .map(list->jsonHelper.importFromJSON(this,list))
+                .map(list -> {
+                    if (list.size() > 0) {
+                        listDTO.addAll(list);
+                        Log.i(TAG, "MainActivity_init: listDTO.size="+listDTO.size());
+                    }
+                    return listDTO;
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe();
+
+       /* Observable.just(jsonHelper.importFromJSON(this))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(list -> {
                     if (list.size() > 0) {
                         listDTO.addAll(list);
                     }
-                });
+                });*/
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @SuppressLint("ResourceType")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "onCreate: START");
+        Log.i(TAG, "MainActivity_onCreate: START");
         super.onCreate(savedInstanceState);
         bindingActMain = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(bindingActMain.getRoot());
@@ -191,8 +201,9 @@ public class MainActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static void backgroundWorkPeriodic(Context context) {
-        PeriodicWorkRequest myWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class, 6, TimeUnit.HOURS, 5, TimeUnit.HOURS)
+        PeriodicWorkRequest myWorkRequest = new PeriodicWorkRequest.Builder(MyWorker.class, 4, TimeUnit.HOURS)
                 .addTag("UNIQUE")
+                .setConstraints(new Constraints.Builder().setRequiredNetworkType(CONNECTED).setRequiresCharging(true).build())
                 .build();
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("UNIQUE", ExistingPeriodicWorkPolicy.KEEP, myWorkRequest);
     }
